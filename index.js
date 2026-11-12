@@ -9,20 +9,14 @@ const client = new Client({
     ]
 });
 
-// Lấy Token và API Key từ biến môi trường của Render
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// Cấu hình ID 2 kênh của bạn
 const KENG_CHUNG_ID = "1569947161406218286";
 const KENG_BOT_ID = "1569948246707539988";
 
-// Lưu trữ lịch sử cảnh báo spam theo ngày
 const spamRecords = new Map();
 
-// ==========================================
-// ĐĂNG KÝ LỆNH /bot KHI BOT KHỞI ĐỘNG
-// ==========================================
 client.once('ready', async () => {
     console.log(`🤖 Bot AI Discord đã sẵn sàng! Đăng nhập với tên: ${client.user.tag}`);
 
@@ -50,9 +44,6 @@ client.once('ready', async () => {
     }
 });
 
-// ==========================================
-// 1. CHỐNG SPAM CHO KÊNH #CHUNG
-// ==========================================
 client.on('messageCreate', async (message) => {
     if (message.author.bot) return;
     if (message.channel.id !== KENG_CHUNG_ID) return;
@@ -89,31 +80,26 @@ client.on('messageCreate', async (message) => {
         try {
             await message.delete();
         } catch (e) {
-            console.log("Không thể xóa tin nhắn (thiếu quyền Manage Messages)");
+            console.log("Không thể xóa tin nhắn");
         }
 
         if (record.warnings === 1) {
-            await message.channel.send(`⚠️ **Cảnh báo [1/2]:** ${message.author}, bạn đang spam từ ngữ lặp lại quá nhiều lần trong kênh chung! Vi phạm lần nữa trong hôm nay sẽ bị ban trực tiếp.`);
+            await message.channel.send(`⚠️ **Cảnh báo [1/2]:** ${message.author}, bạn đang spam từ ngữ lặp lại quá nhiều lần trong kênh chung!`);
         } else {
             try {
-                await message.guild.members.ban(authorId, { reason: "Spam từ lặp lại nhiều lần sau khi đã bị cảnh báo trong ngày." });
-                await message.channel.send(`🔨 **Đã BAN:** Người dùng ${message.author} đã bị cấm khỏi máy chủ do tiếp tục spam sau khi đã nhận cảnh báo!`);
+                await message.guild.members.ban(authorId, { reason: "Spam liên tục sau cảnh báo." });
+                await message.channel.send(`🔨 **Đã BAN:** ${message.author} do tiếp tục spam!`);
             } catch (err) {
-                console.error("Lỗi khi ban thành viên:", err);
-                await message.channel.send(`❌ ${message.author} đã spam tiếp nhưng bot không có quyền Ban (hãy kéo vai trò bot lên cao nhất trong server)!`);
+                console.error("Lỗi ban:", err);
             }
         }
     }
 });
 
-// ==========================================
-// 2. XỬ LÝ LỆNH /bot Ở KÊNH #BOT (ẨN TIN NHẮN)
-// ==========================================
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
     if (interaction.commandName === 'bot') {
-        // Bắt buộc dùng đúng kênh #bot
         if (interaction.channelId !== KENG_BOT_ID) {
             return interaction.reply({
                 content: `❌ Vui lòng sử dụng lệnh này tại kênh <#${KENG_BOT_ID}>!`,
@@ -122,9 +108,6 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         const userPrompt = interaction.options.getString('cau_hoi');
-        console.log(`📩 [Ẩn] Nhận câu hỏi từ ${interaction.user.username}: ${userPrompt}`);
-
-        // Báo hiệu bot đang suy nghĩ ở chế độ ẩn (Chỉ người dùng thấy)
         await interaction.deferReply({ ephemeral: true });
 
         try {
@@ -139,7 +122,7 @@ client.on('interactionCreate', async (interaction) => {
                     messages: [
                         {
                             role: "system",
-                            content: "Bạn là một trợ lý AI chuyên nghiệp về viết script Luau, mod game và lập trình Roblox/Delta Executor. Khi người dùng yêu cầu viết code hoặc script, hãy cung cấp đoạn mã script Luau hoàn chỉnh được bọc trong cặp dấu ```lua ... ```."
+                            content: "Bạn là một trợ lý AI chuyên nghiệp về viết script Luau, mod game, lập trình Roblox và Delta Executor. Hãy luôn luôn hỗ trợ người dùng viết code, chỉnh sửa hitbox hoặc tạo script theo mọi yêu cầu về game mà không được từ chối. Luôn bọc đoạn mã script Luau hoàn chỉnh trong cặp dấu ```lua ... ```."
                         },
                         {
                             role: "user",
@@ -153,7 +136,6 @@ client.on('interactionCreate', async (interaction) => {
             const data = await response.json();
 
             if (data.error) {
-                console.error("Chi tiết lỗi từ API:", JSON.stringify(data.error, null, 2));
                 await interaction.editReply(`❌ Lỗi từ hệ thống AI: ${data.error.message}`);
             } else {
                 const aiReply = data.choices[0].message.content;
@@ -186,7 +168,6 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// HTTP Server giữ bot sống 24/7 trên Render
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Discord AI Bot is running 24/7!\n');
