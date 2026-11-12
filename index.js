@@ -135,7 +135,7 @@ client.on('interactionCreate', async (interaction) => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: "google/gemma-2-9b-it:free", // Đã chuyển sang model Gemma 2 siêu tốc, không bị nghẽn
+                    model: "deepseek/deepseek-chat:free", // Đã chuyển sang DeepSeek Chat miễn phí, cực kỳ mượt và ổn định
                     messages: [
                         {
                             role: "system",
