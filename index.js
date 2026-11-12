@@ -10,10 +10,10 @@ const client = new Client({
 });
 
 // Token Discord Bot của bạn
-const DISCORD_TOKEN = "MTU2OTk2MDA3MzY0MjYzOTQxMA.GP-nOU.UckdtB6C8RUOvL_IpixS-hOy_VabtEfkaQTO78";
+const DISCORD_TOKEN = "MTU2OTk2MDA3MzY0MjYzOTQxMA.Gk0BaI.FzWbt6BUp0jYCP_KitV7XdwxAI-JzGvvrIUzRA";
 
 // OpenRouter API Key
-const OPENROUTER_API_KEY = "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";
+const OPENROUTER_API_KEY = "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";
 
 client.once('ready', () => {
     console.log(`🤖 Bot AI Discord đã sẵn sàng! Đăng nhập với tên: ${client.user.tag}`);
