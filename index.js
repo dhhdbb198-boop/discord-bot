@@ -135,7 +135,7 @@ client.on('interactionCreate', async (interaction) => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: "deepseek/deepseek-chat:free", // Đã chuyển sang DeepSeek Chat miễn phí, cực kỳ mượt và ổn định
+                    model: "deepseek/deepseek-chat", // Đã chuyển sang DeepSeek Chat chuẩn
                     messages: [
                         {
                             role: "system",
