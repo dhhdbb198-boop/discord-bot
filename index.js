@@ -28,8 +28,8 @@ client.on('messageCreate', async (message) => {
     // ==========================================
     // CẤU HÌNH ID CÁC KÊNH TRONG SERVER CỦA BẠN
     // ==========================================
-    const KENG_CHUNG_ID = "ID_KENH_CHUNG_O_DAY"; // Thay ID kênh chung của bạn vào đây
-    const KENG_BOT_ID = "ID_KENH_BOT_O_DAY";     // Thay ID kênh script/bot AI của bạn vào đây
+    const KENG_CHUNG_ID = "1569947161406218286"; // ID Kênh chung (Chống spam)
+    const KENG_BOT_ID = "1569948246707539988";     // ID Kênh bot (Trợ lý AI / Script)
 
     // ==========================================
     // 1. XỬ LÝ RIÊNG CHO KÊNH CHUNG (CHỐNG SPAM)
