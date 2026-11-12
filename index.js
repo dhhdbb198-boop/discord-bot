@@ -135,7 +135,7 @@ client.on('interactionCreate', async (interaction) => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: "meta-llama/llama-3.1-8b-instruct",
+                    model: "google/gemma-2-9b-it:free", // Đã chuyển sang model Gemma 2 siêu tốc, không bị nghẽn
                     messages: [
                         {
                             role: "system",
