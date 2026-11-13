@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, AttachmentBuilder, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
 const http = require('http');
 
 const client = new Client({
@@ -120,14 +120,14 @@ client.on('interactionCreate', async (interaction) => {
                     messages: [
                         {
                             role: "system",
-                            content: "Bạn là một trợ lý lập trình Roblox và Luau chuyên nghiệp."
+                            content: "Bạn là một trợ lý lập trình Roblox, Lua và Luau chuyên nghiệp, viết code tối ưu và chuẩn xác."
                         },
                         {
                             role: "user",
                             content: userPrompt
                         }
                     ],
-                    temperature: 0.5
+                    temperature: 0.4
                 })
             });
 
@@ -138,28 +138,17 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             const aiReply = data.choices[0].message.content;
-            const codeMatch = aiReply.match(/```(?:lua)?\n([\s\S]*?)```/);
 
-            // Nếu AI có trả về đoạn mã code Luau thì tự động tách file .lua gửi riêng cho gọn
-            if (codeMatch && codeMatch[1]) {
-                const rawCode = codeMatch[1].trim();
-                let textResponse = aiReply.replace(/```(?:lua)?\n[\s\S]*?```/, '').trim();
-
-                if (textResponse.length > 1900) {
-                    textResponse = textResponse.substring(0, 1900) + "...";
+            // In toàn bộ câu trả lời kèm code trực tiếp ra khung chat văn bản, không tạo file nữa
+            if (aiReply.length > 1950) {
+                // Nếu quá dài thì cắt bớt để không bị lỗi Discord
+                const chunks = aiReply.match(/[\s\S]{1,1950}/g);
+                await interaction.editReply(chunks[0]);
+                for (let i = 1; i < chunks.length; i++) {
+                    await interaction.followup({ content: chunks[i], ephemeral: true });
                 }
-
-                const buffer = Buffer.from(rawCode, 'utf-8');
-                const attachment = new AttachmentBuilder(buffer, { name: 'script.lua' });
-
-                await interaction.editReply({
-                    content: textResponse.length > 0 ? textResponse : `📁 **Dưới đây là file script Luau dành cho bạn:**`,
-                    files: [attachment]
-                });
             } else {
-                // Nếu không có code (hoặc AI giải thích/từ chối bình thường), cứ in thẳng câu trả lời ra cho người dùng đọc
-                const safeReply = aiReply.length > 1950 ? aiReply.substring(0, 1950) + "..." : aiReply;
-                await interaction.editReply(safeReply);
+                await interaction.editReply(aiReply);
             }
 
         } catch (err) {
