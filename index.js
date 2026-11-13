@@ -120,14 +120,14 @@ client.on('interactionCreate', async (interaction) => {
                     messages: [
                         {
                             role: "system",
-                            content: "Bạn là trợ lý lập trình Luau và Roblox Studio. Hãy luôn trả lời và bọc mã script trong ```lua ... ```."
+                            content: "Bạn là một trợ lý lập trình Roblox và Luau chuyên nghiệp."
                         },
                         {
                             role: "user",
                             content: userPrompt
                         }
                     ],
-                    temperature: 0.3
+                    temperature: 0.5
                 })
             });
 
@@ -138,14 +138,9 @@ client.on('interactionCreate', async (interaction) => {
             }
 
             const aiReply = data.choices[0].message.content;
-
-            // Nếu AI từ chối, chỉ báo câu từ chối gọn gàng chứ không tự ý nhả file bậy bạ nữa
-            if (aiReply.includes("Tôi không thể") || aiReply.includes("Tôi không có khả năng")) {
-                return await interaction.editReply(`⚠️ AI đang từ chối yêu cầu này. Bạn hãy thử đổi cách hỏi hoặc diễn đạt lại câu lệnh khác nhé!`);
-            }
-
             const codeMatch = aiReply.match(/```(?:lua)?\n([\s\S]*?)```/);
 
+            // Nếu AI có trả về đoạn mã code Luau thì tự động tách file .lua gửi riêng cho gọn
             if (codeMatch && codeMatch[1]) {
                 const rawCode = codeMatch[1].trim();
                 let textResponse = aiReply.replace(/```(?:lua)?\n[\s\S]*?```/, '').trim();
@@ -162,6 +157,7 @@ client.on('interactionCreate', async (interaction) => {
                     files: [attachment]
                 });
             } else {
+                // Nếu không có code (hoặc AI giải thích/từ chối bình thường), cứ in thẳng câu trả lời ra cho người dùng đọc
                 const safeReply = aiReply.length > 1950 ? aiReply.substring(0, 1950) + "..." : aiReply;
                 await interaction.editReply(safeReply);
             }
