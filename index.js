@@ -1,4 +1,5 @@
 const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
+const { exec } = require('child_process');
 const http = require('http');
 
 const client = new Client({
@@ -14,6 +15,7 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 const KENG_CHUNG_ID = "1569947161406218286";
 const KENG_BOT_ID = "1569948246707539988";
+const BUFF_TIKTOK_CHANNEL_ID = "1570979699784548403"; //[span_1](start_span)[span_1](end_span)
 
 const spamRecords = new Map();
 
@@ -28,6 +30,24 @@ client.once('ready', async () => {
                 option.setName('cau_hoi')
                     .setDescription('Nhập nội dung câu hỏi hoặc yêu cầu của bạn')
                     .setRequired(true)
+            ),
+        new SlashCommandBuilder()
+            .setName('buff')
+            .setDescription('Công cụ tăng tương tác TikTok (Follow, View, Tim)')
+            .addStringOption(option =>
+                option.setName('loai')
+                    .setDescription('Chọn loại buff mong muốn')
+                    .setRequired(true)
+                    .addChoices(
+                        { name: 'Followers (Theo dõi)', value: 'follow' },
+                        { name: 'Views (Lượt xem)', value: 'view' },
+                        { name: 'Likes/Hearts (Tim/Lượt thích)', value: 'like' }
+                    )
+            )
+            .addStringOption(option =>
+                option.setName('url')
+                    .setDescription('Nhập URL Video hoặc Profile TikTok cần chạy')
+                    .setRequired(true)
             )
     ].map(command => command.toJSON());
 
@@ -38,7 +58,7 @@ client.once('ready', async () => {
             Routes.applicationCommands(client.user.id),
             { body: commands }
         );
-        console.log('✅ Đã đăng ký thành công lệnh /bot!');
+        console.log('✅ Đã đăng ký thành công các lệnh Slash (/bot, /buff)!');
     } catch (error) {
         console.error('❌ Lỗi khi đăng ký lệnh Slash:', error);
     }
@@ -93,10 +113,11 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// Xử lý lệnh /bot ở kênh #bot
+// Xử lý các lệnh Slash Interaction
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
+    // Xử lý lệnh /bot
     if (interaction.commandName === 'bot') {
         if (interaction.channelId !== KENG_BOT_ID) {
             return interaction.reply({
@@ -154,6 +175,40 @@ client.on('interactionCreate', async (interaction) => {
             console.error("Lỗi kết nối:", err);
             await interaction.editReply("⚠️ Đã xảy ra lỗi kết nối tới máy chủ AI!");
         }
+    }
+
+    // Xử lý lệnh /buff TikTok
+    if (interaction.commandName === 'buff') {
+        if (interaction.channelId !== BUFF_TIKTOK_CHANNEL_ID) {
+            return interaction.reply({
+                content: `❌ Vui lòng sử dụng lệnh này tại kênh <#${BUFF_TIKTOK_CHANNEL_ID}>!`,
+                ephemeral: true
+            });
+        }
+
+        const serviceType = interaction.options.getString('loai');
+        const targetUrl = interaction.options.getString('url');
+
+        await interaction.deferReply({ ephemeral: true });
+
+        // Gọi tool/script python (ví dụ: run.py hoặc module tùy chỉnh)
+        // Bạn có thể tùy chỉnh lại tham số truyền vào file run.py cho phù hợp với cấu trúc project của bạn
+        const command = `python run.py --service ${serviceType} --url "${targetUrl}"`;
+
+        exec(command, (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Lỗi thực thi tool: ${error.message}`);
+                return interaction.editReply(`❌ Đã xảy ra lỗi khi chạy công cụ buff: \`\`\`${error.message}\`\`\``);
+            }
+
+            if (stderr) {
+                console.error(`Stderr: ${stderr}`);
+            }
+
+            // Gửi kết quả phản hồi về cho người dùng
+            const outputMessage = `✅ **Đã tiếp nhận yêu cầu Buff TikTok!**\n- **Loại:** ${serviceType}\n- **Link:** ${targetUrl}\n\`\`\`text\n${stdout.slice(0, 1500) || "Đã gửi yêu cầu thành công tới hệ thống."}\n\`\`\``;
+            interaction.editReply(outputMessage);
+        });
     }
 });
 
