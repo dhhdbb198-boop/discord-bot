@@ -167,28 +167,80 @@ client.on('interactionCreate', async (interaction) => {
                 });
             }
 
-            const selectMenu = new StringSelectMenuBuilder()
-                .setCustomId('buff_service_select')
-                .setPlaceholder('📌 Chọn dịch vụ tương tác TikTok')
-                .addOptions([
-                    { label: 'Views (Lượt xem)', value: 'views', description: 'Tăng lượt xem video TikTok' },
-                    { label: 'Likes (Thả tim)', value: 'likes', description: 'Tăng lượt thích video' },
-                    { label: 'Followers (Theo dõi)', value: 'followers', description: 'Tăng người theo dõi kênh' },
-                    { label: 'Shares (Chia sẻ)', value: 'shares', description: 'Tăng lượt chia sẻ video' }
-                ]);
+            await interaction.deferReply({ ephemeral: true });
 
-            const row = new ActionRowBuilder().addComponents(selectMenu);
+            // Tự động gọi python chạy hàm parse_services để lấy danh sách dịch vụ đang hoạt động thực tế
+            const checkProcess = spawn('python', ['-c', `
+from zefoy.services import parse_services
+import requests, urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+try:
+    res = requests.get('https://zefoy.com/', headers={'user-agent': 'Mozilla/5.0'}, verify=False, timeout=15)
+    services = parse_services(res.text)
+    active_services = []
+    for s in services:
+        if s.available:
+            val = s.title.lower().replace(' ', '_')
+            active_services.append(f"{s.title}|{val}")
+    print(",".join(active_services))
+except Exception as e:
+    print("ERROR")
+            `]);
 
-            await interaction.reply({
-                content: '🚀 Vui lòng chọn loại dịch vụ bạn muốn thực thi từ danh sách bên dưới:',
-                components: [row],
-                ephemeral: true
+            let output = '';
+            checkProcess.stdout.on('data', (data) => { output += data.toString(); });
+
+            checkProcess.on('close', async () => {
+                const lines = output.trim().split('\n');
+                const rawServices = lines[lines.length - 1].trim();
+
+                const selectMenu = new StringSelectMenuBuilder()
+                    .setCustomId('buff_service_select')
+                    .setPlaceholder('📌 Chọn dịch vụ TikTok đang hoạt động');
+
+                if (rawServices && rawServices !== 'ERROR') {
+                    const items = rawServices.split(',');
+                    const options = [];
+                    
+                    for (const item of items) {
+                        if (!item.includes('|')) continue;
+                        const [title, val] = item.split('|');
+                        options.push({
+                            label: title,
+                            value: val,
+                            description: `Tăng ${title} cho video TikTok`
+                        });
+                    }
+
+                    if (options.length > 0) {
+                        selectMenu.addOptions(options);
+                    } else {
+                        selectMenu.addOptions([{ label: 'Tất cả dịch vụ đang bảo trì', value: 'none', description: 'Vui lòng thử lại sau' }]);
+                    }
+                } else {
+                    // Fallback an toàn nếu quét lỗi mạng
+                    selectMenu.addOptions([
+                        { label: 'Likes (Thả tim)', value: 'likes', description: 'Tăng lượt thích video' },
+                        { label: 'Followers (Theo dõi)', value: 'followers', description: 'Tăng người theo dõi' },
+                        { label: 'Shares (Chia sẻ)', value: 'shares', description: 'Tăng lượt chia sẻ' }
+                    ]);
+                }
+
+                const row = new ActionRowBuilder().addComponents(selectMenu);
+
+                await interaction.editReply({
+                    content: '🚀 **Hệ thống đã quét và tự động ẩn các dịch vụ đang bảo trì.** Vui lòng chọn dịch vụ khả dụng bên dưới:',
+                    components: [row]
+                });
             });
         }
     } 
     else if (interaction.isStringSelectMenu()) {
         if (interaction.customId === 'buff_service_select') {
             const selectedService = interaction.values[0];
+            if (selectedService === 'none') {
+                return interaction.reply({ content: '❌ Hiện tại không có dịch vụ nào hoạt động.', ephemeral: true });
+            }
 
             const modal = new ModalBuilder()
                 .setCustomId(`buff_modal_${selectedService}`)
@@ -227,7 +279,6 @@ client.on('interactionCreate', async (interaction) => {
                 errorData += data.toString();
             });
 
-            // Lắng nghe sự kiện kết thúc tiến trình Python mà không giới hạn thời gian (không có timeout)
             pythonProcess.on('close', async (code) => {
                 try {
                     console.log(`Python process closed with code ${code}`);
@@ -251,7 +302,7 @@ client.on('interactionCreate', async (interaction) => {
                     }
 
                     if (replyMessage.trim().length === 0) {
-                        replyMessage = "⚠️ Tiến trình chạy xong nhưng không trả về bất kỳ dữ liệu (stdout/stderr) nào.";
+                        replyMessage = "⚠️ Tiến trình chạy xong nhưng không trả về bất kỳ dữ liệu nào.";
                     }
 
                     await interaction.editReply(replyMessage);
