@@ -20,14 +20,20 @@ const spamRecords = new Map();
 client.once('ready', async () => {
     console.log(`🤖 Bot AI Discord đã sẵn sàng! Đăng nhập với tên: ${client.user.tag}`);
 
+    // Đăng ký lệnh /bot có hỗ trợ thêm tùy chọn đính kèm file hoặc ảnh
     const commands = [
         new SlashCommandBuilder()
             .setName('bot')
-            .setDescription('Hỏi AI trợ giúp lập trình và viết script Luau (Chỉ mình bạn thấy)')
+            .setDescription('Hỏi AI trợ giúp lập trình (Có thể gửi kèm file hoặc ảnh)')
             .addStringOption(option =>
                 option.setName('cau_hoi')
-                    .setDescription('Nhập nội dung câu hỏi hoặc yêu cầu của bạn')
+                    .setDescription('Nội dung câu hỏi của bạn')
                     .setRequired(true)
+            )
+            .addAttachmentOption(option =>
+                option.setName('tep_dinh_kem')
+                    .setDescription('Gửi kèm file hoặc hình ảnh (nếu có)')
+                    .setRequired(false)
             )
     ].map(command => command.toJSON());
 
@@ -38,9 +44,9 @@ client.once('ready', async () => {
             Routes.applicationCommands(client.user.id),
             { body: commands }
         );
-        console.log('✅ Đã đăng ký thành công lệnh /bot!');
+        console.log('✅ Đã đăng ký lệnh /bot kèm tính năng đính kèm file/ảnh!');
     } catch (error) {
-        console.error('❌ Lỗi khi đăng ký lệnh Slash:', error);
+        console.error('❌ Lỗi đăng ký lệnh:', error);
     }
 });
 
@@ -93,7 +99,7 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// Xử lý lệnh /bot ở kênh #bot
+// Xử lý lệnh /bot ở kênh #bot (Có hỗ trợ nhận file/ảnh và trả lời riêng tư)
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -106,7 +112,16 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         const userPrompt = interaction.options.getString('cau_hoi');
+        const attachedFile = interaction.options.getAttachment('tep_dinh_kem');
+
+        // Báo hiệu đang suy nghĩ (Chỉ người dùng thấy)
         await interaction.deferReply({ ephemeral: true });
+
+        // Nếu người dùng có gửi kèm file hoặc ảnh, ta gộp thông tin file vào câu hỏi để AI đọc
+        let finalPrompt = userPrompt;
+        if (attachedFile) {
+            finalPrompt += `\n[Người dùng đính kèm file/ảnh: ${attachedFile.name} - Link: ${attachedFile.url}]`;
+        }
 
         try {
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -120,11 +135,11 @@ client.on('interactionCreate', async (interaction) => {
                     messages: [
                         {
                             role: "system",
-                            content: "Bạn là một trợ lý lập trình Roblox, Lua và Luau chuyên nghiệp, viết code tối ưu và chuẩn xác."
+                            content: "Bạn là trợ lý lập trình Roblox, Lua và Luau chuyên nghiệp."
                         },
                         {
                             role: "user",
-                            content: userPrompt
+                            content: finalPrompt
                         }
                     ],
                     temperature: 0.4
@@ -139,9 +154,8 @@ client.on('interactionCreate', async (interaction) => {
 
             const aiReply = data.choices[0].message.content;
 
-            // In toàn bộ câu trả lời kèm code trực tiếp ra khung chat văn bản, không tạo file nữa
+            // Phản hồi trực tiếp dạng văn bản, chỉ mình người đó thấy
             if (aiReply.length > 1950) {
-                // Nếu quá dài thì cắt bớt để không bị lỗi Discord
                 const chunks = aiReply.match(/[\s\S]{1,1950}/g);
                 await interaction.editReply(chunks[0]);
                 for (let i = 1; i < chunks.length; i++) {
