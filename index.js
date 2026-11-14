@@ -211,9 +211,9 @@ client.on('interactionCreate', async (interaction) => {
             const service = interaction.customId.replace('buff_modal_', '');
             const tiktokUrl = interaction.fields.getTextInputValue('tiktok_url_input');
 
+            // Hoãn phản hồi để tránh lỗi "Ứng dụng không phản hồi" từ Discord
             await interaction.deferReply({ ephemeral: true });
 
-            // Khởi chạy tiến trình Python (spawn run.py với các tham số truyền vào)
             const pythonProcess = spawn('python', ['run.py', service, tiktokUrl]);
 
             let outputData = '';
@@ -228,17 +228,21 @@ client.on('interactionCreate', async (interaction) => {
             });
 
             pythonProcess.on('close', async (code) => {
-                if (code !== 0) {
-                    console.error(`Python script exited with code ${code}: ${errorData}`);
-                    return interaction.editReply(`❌ Tiến trình thực thi gặp lỗi (Code ${code}):\n\`\`\`text\n${errorData.slice(0, 1000) || 'Lỗi không xác định'}\n\`\`\`\n`);
-                }
+                try {
+                    if (code !== 0) {
+                        console.error(`Python error code ${code}: ${errorData}`);
+                        return await interaction.editReply(`❌ Tiến trình thực thi gặp lỗi (Code ${code}):\n\`\`\`text\n${errorData.slice(0, 1000) || 'Lỗi không xác định'}\n\`\`\``);
+                    }
 
-                const resultMessage = outputData.trim().length > 0 ? outputData.trim() : "Đã hoàn tất tiến trình xử lý.";
-                
-                if (resultMessage.length > 1900) {
-                    await interaction.editReply(`✅ **Thực thi thành công!**\n\`\`\`text\n${resultMessage.slice(0, 1900)}\n\`\`\`\n*(Kết quả đã được cắt bớt)*`);
-                } else {
-                    await interaction.editReply(`✅ **Thực thi thành công!**\n\`\`\`text\n${resultMessage}\n\`\`\`\n`);
+                    const resultMessage = outputData.trim().length > 0 ? outputData.trim() : "Đã hoàn tất tiến trình xử lý.";
+                    
+                    if (resultMessage.length > 1900) {
+                        await interaction.editReply(`✅ **Thực thi thành công!**\n\`\`\`text\n${resultMessage.slice(0, 1900)}\n\`\`\``);
+                    } else {
+                        await interaction.editReply(`✅ **Thực thi thành công!**\n\`\`\`text\n${resultMessage}\n\`\`\``);
+                    }
+                } catch (e) {
+                    console.error("Lỗi khi gửi kết quả về Discord:", e);
                 }
             });
         }
