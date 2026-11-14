@@ -20,11 +20,10 @@ const spamRecords = new Map();
 client.once('ready', async () => {
     console.log(`🤖 Bot AI Discord đã sẵn sàng! Đăng nhập với tên: ${client.user.tag}`);
 
-    // Đăng ký lệnh /bot có hỗ trợ thêm tùy chọn đính kèm file hoặc ảnh
     const commands = [
         new SlashCommandBuilder()
             .setName('bot')
-            .setDescription('Hỏi AI trợ giúp lập trình (Có thể gửi kèm file hoặc ảnh)')
+            .setDescription('Hỏi AI trợ giúp (Có thể đính kèm file code hoặc hình ảnh)')
             .addStringOption(option =>
                 option.setName('cau_hoi')
                     .setDescription('Nội dung câu hỏi của bạn')
@@ -32,7 +31,7 @@ client.once('ready', async () => {
             )
             .addAttachmentOption(option =>
                 option.setName('tep_dinh_kem')
-                    .setDescription('Gửi kèm file hoặc hình ảnh (nếu có)')
+                    .setDescription('Đính kèm file script (.lua, .txt) hoặc hình ảnh (PNG, JPG)')
                     .setRequired(false)
             )
     ].map(command => command.toJSON());
@@ -44,7 +43,7 @@ client.once('ready', async () => {
             Routes.applicationCommands(client.user.id),
             { body: commands }
         );
-        console.log('✅ Đã đăng ký lệnh /bot kèm tính năng đính kèm file/ảnh!');
+        console.log('✅ Đã đăng ký lệnh /bot hỗ trợ Vision (xem ảnh) thành công!');
     } catch (error) {
         console.error('❌ Lỗi đăng ký lệnh:', error);
     }
@@ -99,7 +98,7 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// Xử lý lệnh /bot ở kênh #bot (Có hỗ trợ nhận file/ảnh và trả lời riêng tư)
+// Xử lý lệnh /bot ở kênh #bot (Hỗ trợ đọc cả file text và hình ảnh)
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -114,13 +113,48 @@ client.on('interactionCreate', async (interaction) => {
         const userPrompt = interaction.options.getString('cau_hoi');
         const attachedFile = interaction.options.getAttachment('tep_dinh_kem');
 
-        // Báo hiệu đang suy nghĩ (Chỉ người dùng thấy)
         await interaction.deferReply({ ephemeral: true });
 
-        // Nếu người dùng có gửi kèm file hoặc ảnh, ta gộp thông tin file vào câu hỏi để AI đọc
-        let finalPrompt = userPrompt;
+        // Xây dựng mảng nội dung tin nhắn gửi lên OpenRouter (Hỗ trợ đa phương thức: Text + Image/File)
+        let messageContent = [];
+
+        // Kiểm tra xem file đính kèm là hình ảnh hay là file text/code
+        let isImage = false;
         if (attachedFile) {
-            finalPrompt += `\n[Người dùng đính kèm file/ảnh: ${attachedFile.name} - Link: ${attachedFile.url}]`;
+            const contentType = attachedFile.contentType || "";
+            if (contentType.startsWith("image/") || attachedFile.name.match(/\.(png|jpg|jpeg|webp|gif)$/i)) {
+                isImage = true;
+            }
+        }
+
+        // Nếu là file text/code, tải nội dung text nhúng vào prompt
+        let promptText = userPrompt;
+        if (attachedFile && !isImage) {
+            try {
+                const fileRes = await fetch(attachedFile.url);
+                const fileText = await fileRes.text();
+                if (fileText && fileText.length < 15000) {
+                    promptText += `\n\nNội dung từ file đính kèm (${attachedFile.name}):\n\`\`\`\n${fileText}\n\`\`\``;
+                }
+            } catch (e) {
+                console.log("Không thể đọc file:", e);
+            }
+        }
+
+        // Đưa text vào nội dung gửi AI
+        messageContent.push({
+            type: "text",
+            text: promptText
+        });
+
+        // Nếu là hình ảnh, cấu hình định dạng chuẩn để AI Vision đọc trực tiếp URL của ảnh
+        if (attachedFile && isImage) {
+            messageContent.push({
+                type: "image_url",
+                image_url: {
+                    url: attachedFile.url
+                }
+            });
         }
 
         try {
@@ -131,15 +165,15 @@ client.on('interactionCreate', async (interaction) => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: "meta-llama/llama-3.1-8b-instruct",
+                    model: "google/gemini-2.0-flash-exp:free", // Sử dụng model thông minh có hỗ trợ đọc hình ảnh (Vision) cực tốt
                     messages: [
                         {
                             role: "system",
-                            content: "Bạn là trợ lý lập trình Roblox, Lua và Luau chuyên nghiệp."
+                            content: "Bạn là một trợ lý lập trình Roblox, Lua và Luau chuyên nghiệp. Hãy phân tích kỹ câu hỏi, nội dung file hoặc hình ảnh do người dùng cung cấp để đưa ra giải pháp chính xác."
                         },
                         {
                             role: "user",
-                            content: finalPrompt
+                            content: messageContent
                         }
                     ],
                     temperature: 0.4
@@ -154,7 +188,6 @@ client.on('interactionCreate', async (interaction) => {
 
             const aiReply = data.choices[0].message.content;
 
-            // Phản hồi trực tiếp dạng văn bản, chỉ mình người đó thấy
             if (aiReply.length > 1950) {
                 const chunks = aiReply.match(/[\s\S]{1,1950}/g);
                 await interaction.editReply(chunks[0]);
