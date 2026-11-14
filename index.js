@@ -43,7 +43,7 @@ client.once('ready', async () => {
             Routes.applicationCommands(client.user.id),
             { body: commands }
         );
-        console.log('✅ Đã đăng ký lệnh /bot hỗ trợ Vision (xem ảnh) thành công!');
+        console.log('✅ Đã đăng ký lệnh /bot thành công!');
     } catch (error) {
         console.error('❌ Lỗi đăng ký lệnh:', error);
     }
@@ -98,7 +98,7 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// Xử lý lệnh /bot ở kênh #bot (Hỗ trợ đọc cả file text và hình ảnh)
+// Xử lý lệnh /bot ở kênh #bot
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -115,11 +115,9 @@ client.on('interactionCreate', async (interaction) => {
 
         await interaction.deferReply({ ephemeral: true });
 
-        // Xây dựng mảng nội dung tin nhắn gửi lên OpenRouter (Hỗ trợ đa phương thức: Text + Image/File)
         let messageContent = [];
-
-        // Kiểm tra xem file đính kèm là hình ảnh hay là file text/code
         let isImage = false;
+
         if (attachedFile) {
             const contentType = attachedFile.contentType || "";
             if (contentType.startsWith("image/") || attachedFile.name.match(/\.(png|jpg|jpeg|webp|gif)$/i)) {
@@ -127,7 +125,6 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        // Nếu là file text/code, tải nội dung text nhúng vào prompt
         let promptText = userPrompt;
         if (attachedFile && !isImage) {
             try {
@@ -141,13 +138,11 @@ client.on('interactionCreate', async (interaction) => {
             }
         }
 
-        // Đưa text vào nội dung gửi AI
         messageContent.push({
             type: "text",
             text: promptText
         });
 
-        // Nếu là hình ảnh, cấu hình định dạng chuẩn để AI Vision đọc trực tiếp URL của ảnh
         if (attachedFile && isImage) {
             messageContent.push({
                 type: "image_url",
@@ -165,7 +160,7 @@ client.on('interactionCreate', async (interaction) => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: "google/gemini-2.0-flash-exp:free", // Sử dụng model thông minh có hỗ trợ đọc hình ảnh (Vision) cực tốt
+                    model: "google/gemini-2.5-flash", // Đã đổi sang model Gemini chuẩn, cực kỳ ổn định và hỗ trợ xem ảnh
                     messages: [
                         {
                             role: "system",
