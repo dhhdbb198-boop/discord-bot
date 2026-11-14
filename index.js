@@ -20,19 +20,15 @@ const spamRecords = new Map();
 client.once('ready', async () => {
     console.log(`🤖 Bot AI Discord đã sẵn sàng! Đăng nhập với tên: ${client.user.tag}`);
 
+    // Đăng ký lệnh /bot thuần văn bản
     const commands = [
         new SlashCommandBuilder()
             .setName('bot')
-            .setDescription('Hỏi AI trợ giúp (Có thể đính kèm file code hoặc hình ảnh)')
+            .setDescription('Hỏi AI trợ giúp lập trình Luau và Roblox (Chỉ mình bạn thấy)')
             .addStringOption(option =>
                 option.setName('cau_hoi')
-                    .setDescription('Nội dung câu hỏi của bạn')
+                    .setDescription('Nhập nội dung câu hỏi hoặc yêu cầu của bạn')
                     .setRequired(true)
-            )
-            .addAttachmentOption(option =>
-                option.setName('tep_dinh_kem')
-                    .setDescription('Đính kèm file script (.lua, .txt) hoặc hình ảnh (PNG, JPG)')
-                    .setRequired(false)
             )
     ].map(command => command.toJSON());
 
@@ -43,9 +39,9 @@ client.once('ready', async () => {
             Routes.applicationCommands(client.user.id),
             { body: commands }
         );
-        console.log('✅ Đã đăng ký lệnh /bot thành công!');
+        console.log('✅ Đã đăng ký thành công lệnh /bot!');
     } catch (error) {
-        console.error('❌ Lỗi đăng ký lệnh:', error);
+        console.error('❌ Lỗi khi đăng ký lệnh Slash:', error);
     }
 });
 
@@ -98,7 +94,7 @@ client.on('messageCreate', async (message) => {
     }
 });
 
-// Xử lý lệnh /bot ở kênh #bot
+// Xử lý lệnh /bot ở kênh #bot (Thuần văn bản, bảo mật riêng tư)
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -111,46 +107,7 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         const userPrompt = interaction.options.getString('cau_hoi');
-        const attachedFile = interaction.options.getAttachment('tep_dinh_kem');
-
         await interaction.deferReply({ ephemeral: true });
-
-        let messageContent = [];
-        let isImage = false;
-
-        if (attachedFile) {
-            const contentType = attachedFile.contentType || "";
-            if (contentType.startsWith("image/") || attachedFile.name.match(/\.(png|jpg|jpeg|webp|gif)$/i)) {
-                isImage = true;
-            }
-        }
-
-        let promptText = userPrompt;
-        if (attachedFile && !isImage) {
-            try {
-                const fileRes = await fetch(attachedFile.url);
-                const fileText = await fileRes.text();
-                if (fileText && fileText.length < 15000) {
-                    promptText += `\n\nNội dung từ file đính kèm (${attachedFile.name}):\n\`\`\`\n${fileText}\n\`\`\``;
-                }
-            } catch (e) {
-                console.log("Không thể đọc file:", e);
-            }
-        }
-
-        messageContent.push({
-            type: "text",
-            text: promptText
-        });
-
-        if (attachedFile && isImage) {
-            messageContent.push({
-                type: "image_url",
-                image_url: {
-                    url: attachedFile.url
-                }
-            });
-        }
 
         try {
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -160,17 +117,18 @@ client.on('interactionCreate', async (interaction) => {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: "google/gemini-2.5-flash", // Đã đổi sang model Gemini chuẩn, cực kỳ ổn định và hỗ trợ xem ảnh
+                    model: "meta-llama/llama-3.1-8b-instruct",
                     messages: [
                         {
                             role: "system",
-                            content: "Bạn là một trợ lý lập trình Roblox, Lua và Luau chuyên nghiệp. Hãy phân tích kỹ câu hỏi, nội dung file hoặc hình ảnh do người dùng cung cấp để đưa ra giải pháp chính xác."
+                            content: "Bạn là một trợ lý lập trình Roblox, Lua và Luau chuyên nghiệp."
                         },
                         {
                             role: "user",
-                            content: messageContent
+                            content: userPrompt
                         }
                     ],
+                    max_tokens: 2000,
                     temperature: 0.4
                 })
             });
