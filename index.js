@@ -211,7 +211,7 @@ client.on('interactionCreate', async (interaction) => {
             const service = interaction.customId.replace('buff_modal_', '');
             const tiktokUrl = interaction.fields.getTextInputValue('tiktok_url_input');
 
-            // Hoãn phản hồi để tránh lỗi "Ứng dụng không phản hồi" từ Discord
+            // Hoãn phản hồi để tránh lỗi timeout của Discord
             await interaction.deferReply({ ephemeral: true });
 
             const pythonProcess = spawn('python', ['run.py', service, tiktokUrl]);
@@ -227,20 +227,34 @@ client.on('interactionCreate', async (interaction) => {
                 errorData += data.toString();
             });
 
+            // Lắng nghe sự kiện kết thúc tiến trình Python mà không giới hạn thời gian (không có timeout)
             pythonProcess.on('close', async (code) => {
                 try {
+                    console.log(`Python process closed with code ${code}`);
+                    console.log(`STDOUT: ${outputData}`);
+                    console.log(`STDERR: ${errorData}`);
+
+                    let replyMessage = "";
+
                     if (code !== 0) {
-                        console.error(`Python error code ${code}: ${errorData}`);
-                        return await interaction.editReply(`❌ Tiến trình thực thi gặp lỗi (Code ${code}):\n\`\`\`text\n${errorData.slice(0, 1000) || 'Lỗi không xác định'}\n\`\`\``);
+                        replyMessage += `❌ **Tiến trình Python báo lỗi (Exit Code: ${code})**\n`;
+                    } else {
+                        replyMessage += `✅ **Tiến trình hoàn tất!**\n`;
                     }
 
-                    const resultMessage = outputData.trim().length > 0 ? outputData.trim() : "Đã hoàn tất tiến trình xử lý.";
-                    
-                    if (resultMessage.length > 1900) {
-                        await interaction.editReply(`✅ **Thực thi thành công!**\n\`\`\`text\n${resultMessage.slice(0, 1900)}\n\`\`\``);
-                    } else {
-                        await interaction.editReply(`✅ **Thực thi thành công!**\n\`\`\`text\n${resultMessage}\n\`\`\``);
+                    if (errorData.trim().length > 0) {
+                        replyMessage += `⚠️ **Chi tiết lỗi (stderr):**\n\`\`\`text\n${errorData.trim().slice(0, 900)}\n\`\`\`\n`;
                     }
+
+                    if (outputData.trim().length > 0) {
+                        replyMessage += `📋 **Phản hồi (stdout):**\n\`\`\`text\n${outputData.trim().slice(0, 900)}\n\`\`\``;
+                    }
+
+                    if (replyMessage.trim().length === 0) {
+                        replyMessage = "⚠️ Tiến trình chạy xong nhưng không trả về bất kỳ dữ liệu (stdout/stderr) nào.";
+                    }
+
+                    await interaction.editReply(replyMessage);
                 } catch (e) {
                     console.error("Lỗi khi gửi kết quả về Discord:", e);
                 }
